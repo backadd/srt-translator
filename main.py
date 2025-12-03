@@ -8,38 +8,38 @@ from tqdm import tqdm
 from config import load_api_key, save_api_key
 
 
-def translate_text(text, source_language, target_language, api_key):
-    prompt = f"Translate this srt file from {source_language} to {target_language}, reply only with the translated srt file and add no commentary or information to the response:\n\n{text}"
-
-    # Initialize OpenAI client with the API key
-    client = OpenAI(api_key=api_key)
+def translate_text(
+    client: OpenAI, text: str, source_language: str, target_language: str
+) -> str:
+    """
+    Translate a chunk of SRT content using OpenAI.
+    """
+    prompt = (
+        f"Translate this srt file from {source_language} to {target_language}, "
+        "reply only with the translated srt file and add no commentary or information:\n\n"
+        f"{text}"
+    )
 
     try:
         response = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            model="gpt-4o",
+            model="gpt-5-chat-latest",  # faster for longer text
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
         )
+        return response.choices[0].message.content
 
-        translation = response.choices[0].message.content
-        return translation
     except Exception as e:
         print(f"Error during translation: {e}")
         sys.exit(1)
-    return translation
 
 
-def read_srt(file_path):
+def read_srt(file_path: str) -> str:
     with open(file_path, "r") as file:
         content = file.read().strip().split("\n\n")
     return [content[i : i + 50] for i in range(0, len(content), 50)]
 
 
-def format_subtitles(srt_data):
+def format_subtitles(srt_data: str) -> str:
     # Normalize line endings to Unix-style just in case
     srt_data = srt_data.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -106,10 +106,11 @@ def main():
 
     lines = read_srt(args.file_path)
     results = ""
+    client = OpenAI(api_key=api_key)
 
     for line in tqdm(lines, desc="Translating srt", unit="chunks"):
         translated_line = translate_text(
-            "\n".join(line), args.source_lang, args.target_lang, api_key
+            client, "\n".join(line), args.source_lang, args.target_lang
         )
         results += translated_line + "\n"
 
